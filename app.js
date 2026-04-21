@@ -12,53 +12,37 @@ function App() {
 
   const formatTimeout = useRef(null);
 
-  // 🔥 STREAM CALL
+  // ✅ VERCEL API CALL
   const streamCall = async (model, prompt, onChunk) => {
-    const res = await fetch("http://localhost:5000/api/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "user", content: prompt }],
-        stream: true,
-        max_tokens: model.includes("70b") ? 2000 : 800,
-        temperature: 0.7
-      })
-    });
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: model.includes("70b") ? 2000 : 800,
+          temperature: 0.7
+        })
+      });
 
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
+      const data = await res.json();
 
-    let full = "";
+      const content = data?.choices?.[0]?.message?.content;
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      const chunk = decoder.decode(value);
-      const lines = chunk.split("\n").filter(Boolean);
-
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-
-        const json = line.replace("data: ", "");
-        if (json === "[DONE]") return full;
-
-        try {
-          const parsed = JSON.parse(json);
-          const content = parsed.choices?.[0]?.delta?.content;
-
-          if (content) {
-            full += content;
-            onChunk(full);
-          }
-        } catch {}
+      if (!content) {
+        onChunk("⚠️ No response from model");
+        return;
       }
-    }
 
-    return full;
+      onChunk(content);
+
+    } catch (err) {
+      console.error(err);
+      onChunk("❌ API error");
+    }
   };
 
   // 🧠 AGENTS
@@ -143,7 +127,6 @@ Rules:
 
     cache[query] = finalFormatted;
 
-    // ✅ SAVE HISTORY
     setHistory(prev => [
       { query, result: finalFormatted },
       ...prev
@@ -233,7 +216,6 @@ Rules:
   return (
     <div className="layout">
 
-      {/* SIDEBAR */}
       <div className="sidebar">
         <h2>⚡ Auto AI</h2>
 
@@ -259,7 +241,6 @@ Rules:
         </div>
       </div>
 
-      {/* MAIN */}
       <div className="main-content">
         <h1>Hybrid Multi-Model Automotive AI</h1>
 
@@ -279,14 +260,12 @@ Rules:
 
         <div className="output-container">
 
-          {/* REPORT */}
           {activeTab === "report" && (
             <div dangerouslySetInnerHTML={{
               __html: output || "<p>Results will appear here...</p>"
             }} />
           )}
 
-          {/* AGENTS */}
           {activeTab === "agents" && (
             <div className="panel">
               <h3>Active Models</h3>
@@ -299,7 +278,6 @@ Rules:
             </div>
           )}
 
-          {/* HISTORY */}
           {activeTab === "history" && (
             <div className="panel">
               <h3>Query History</h3>
